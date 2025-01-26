@@ -13,6 +13,7 @@ import org.lwjgl.opengl.GL45C;
 import static me.cortex.nvidium.RenderPipeline.GL_DRAW_INDIRECT_ADDRESS_NV;
 import static me.cortex.nvidium.gl.shader.ShaderType.*;
 import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL13C.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL33.glGenSamplers;
 import static org.lwjgl.opengl.NVMeshShader.glMultiDrawMeshTasksIndirectNV;
 import static org.lwjgl.opengl.NVVertexBufferUnifiedMemory.glBufferAddressRangeNV;
@@ -37,7 +38,7 @@ public class PrimaryTerrainRasterizer extends Phase {
     }
 
     private static void setTexture(int textureId, int bindingPoint) {
-        GlStateManager._activeTexture(33984 + bindingPoint);
+        GlStateManager._activeTexture(GL_TEXTURE0 + bindingPoint);
         GlStateManager._bindTexture(textureId);
     }
 
@@ -45,7 +46,7 @@ public class PrimaryTerrainRasterizer extends Phase {
         shader.bind();
 
         int blockId = MinecraftClient.getInstance().getTextureManager().getTexture(Identifier.of("minecraft", "textures/atlas/blocks.png")).getGlId();
-        int lightId = ((LightMapAccessor)MinecraftClient.getInstance().gameRenderer.getLightmapTextureManager()).getTexture().getGlId();
+        int lightId = ((LightMapAccessor)MinecraftClient.getInstance().gameRenderer.getLightmapTextureManager()).getLightmapFramebuffer().getColorAttachment();
 
         GL45C.glBindSampler(0, blockSampler);
         GL45C.glBindSampler(1, lightSampler);

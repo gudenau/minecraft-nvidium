@@ -3,10 +3,10 @@ package me.cortex.nvidium.sodiumCompat;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import it.unimi.dsi.fastutil.longs.LongArrays;
 import me.cortex.nvidium.Nvidium;
-import me.jellysquid.mods.sodium.client.model.quad.properties.ModelQuadFacing;
-import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildOutput;
-import me.jellysquid.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
-import me.jellysquid.mods.sodium.client.util.NativeBuffer;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildOutput;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
+import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Vector3f;
@@ -90,24 +90,26 @@ public class SodiumResultCompatibility {
         var translucentData  = result.meshes.get(DefaultTerrainRenderPasses.TRANSLUCENT);
         if (translucentData != null) {
             int quadCount = 0;
-            for (int i = 0; i < 7; i++) {
-                var part = translucentData.getVertexRanges()[i];
-                quadCount += part != null?part.vertexCount()/4:0;
+            var counts = translucentData.getVertexCounts();
+            for(int i = 0; i < 7; i++) {
+                quadCount += counts != null ? counts[i] / 4 : 0;
             }
             int quadId = 0;
             long[] sortingData = new long[quadCount];
             long[] srcs = new long[7];
+            long vertexOffset = 0;
             for (int i = 0; i < 7; i++) {
-                var part = translucentData.getVertexRanges()[i];
-                if (part != null) {
-                    long src = MemoryUtil.memAddress(translucentData.getVertexData().getDirectBuffer()) + (long) part.vertexStart() * formatSize;
+                if (counts != null) {
+                    long src = MemoryUtil.memAddress(translucentData.getVertexData().getDirectBuffer()) + vertexOffset;
+                    vertexOffset += (long) counts[i] * formatSize;
+
                     srcs[i] = src;
 
                     float cx = 0;
                     float cy = 0;
                     float cz = 0;
                     //Update the meta bits of the model format
-                    for (int j = 0; j < part.vertexCount(); j++) {
+                    for (int j = 0; j < counts[i]; j++) {
                         long base = src + (long) j * formatSize;
                         byte flags = (byte) 0b100;//Mipping, No alpha cut
                         MemoryUtil.memPutByte(base + 6L, flags);//Note: the 6 here is the offset into the vertex format
@@ -170,17 +172,22 @@ public class SodiumResultCompatibility {
         var cutout = result.meshes.get(DefaultTerrainRenderPasses.CUTOUT);
 
         //Do all but translucent
+        long solidVertexOffset = 0;
+        long cutoutVertexOffset = 0;
+
         for (int i = 0; i < 7; i++) {
             int poff = offset;
             if (solid != null) {
-                var part = solid.getVertexRanges()[i];
-                if (part != null) {
-                    long src = MemoryUtil.memAddress(solid.getVertexData().getDirectBuffer()) + (long) part.vertexStart() * formatSize;
+                var counts = solid.getVertexCounts();
+                if (counts != null) {
+                    long src = MemoryUtil.memAddress(solid.getVertexData().getDirectBuffer()) + solidVertexOffset;
+                    solidVertexOffset += (long) counts[i] * formatSize;
+
                     long dst = outPtr + offset * 4L * formatSize;
-                    MemoryUtil.memCopy(src, dst, (long) part.vertexCount() * formatSize);
+                    MemoryUtil.memCopy(src, dst, (long) counts[i] * formatSize);
 
                     //Update the meta bits of the model format
-                    for (int j = 0; j < part.vertexCount(); j++) {
+                    for (int j = 0; j < counts[i]; j++) {
                         long base = dst+ (long) j * formatSize;
                         byte flags = (byte) 0b100;//Mipping, No alpha cut
                         MemoryUtil.memPutByte(base + 6L, flags);//Note: the 6 here is the offset into the vertex format
@@ -188,18 +195,19 @@ public class SodiumResultCompatibility {
                         updateSectionBounds(min, max, base);
                     }
 
-                    offset += part.vertexCount()/4;
+                    offset += counts[i] / 4;
                 }
             }
             if (cutout != null) {
-                var part = cutout.getVertexRanges()[i];
-                if (part != null) {
-                    long src = MemoryUtil.memAddress(cutout.getVertexData().getDirectBuffer()) + (long) part.vertexStart() * formatSize;
+                var counts = cutout.getVertexCounts();
+                if (counts != null) {
+                    long src = MemoryUtil.memAddress(cutout.getVertexData().getDirectBuffer()) + cutoutVertexOffset;
+                    cutoutVertexOffset += (long) counts[i] * formatSize;
                     long dst = outPtr + offset * 4L * formatSize;
-                    MemoryUtil.memCopy(src, dst, (long) part.vertexCount() * formatSize);
+                    MemoryUtil.memCopy(src, dst, (long) counts[i] * formatSize);
 
                     //Update the meta bits of the model format
-                    for (int j = 0; j < part.vertexCount(); j++) {
+                    for (int j = 0; j < counts[i]; j++) {
                         long base = dst + (long) j * formatSize;
                         short sflags = MemoryUtil.memGetByte(base + 6L);
                         short mipbits = (short) ((sflags&(3<<1))>>1);
@@ -213,7 +221,7 @@ public class SodiumResultCompatibility {
                         updateSectionBounds(min, max, base);
                     }
 
-                    offset += part.vertexCount()/4;
+                    offset += counts[i] / 4;
                 }
             }
             outOffsets[i] = (short) (offset - poff);

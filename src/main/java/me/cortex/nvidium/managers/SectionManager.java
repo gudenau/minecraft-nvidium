@@ -11,9 +11,10 @@ import me.cortex.nvidium.sodiumCompat.IRepackagedResult;
 import me.cortex.nvidium.util.BufferArena;
 import me.cortex.nvidium.util.SegmentedManager;
 import me.cortex.nvidium.util.UploadingBufferStream;
-import me.jellysquid.mods.sodium.client.render.SodiumWorldRenderer;
-import me.jellysquid.mods.sodium.client.render.chunk.RenderSection;
-import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildOutput;
+import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.BuilderTaskOutput;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildOutput;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.ChunkSectionPos;
 import org.joml.Vector3i;
@@ -49,7 +50,7 @@ public class SectionManager {
         this.section2terrain.defaultReturnValue(-1);
     }
 
-    public void uploadChunkBuildResult(ChunkBuildOutput result) {
+    public void uploadChunkBuildResult(BuilderTaskOutput result) {
         var output = ((IRepackagedResult)result).getOutput();
 
         RenderSection section = result.render;

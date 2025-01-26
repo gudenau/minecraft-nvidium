@@ -1,21 +1,23 @@
 package me.cortex.nvidium.sodiumCompat;
 
 
-import me.jellysquid.mods.sodium.client.gl.attribute.GlVertexAttributeFormat;
-import me.jellysquid.mods.sodium.client.gl.attribute.GlVertexFormat;
-import me.jellysquid.mods.sodium.client.render.chunk.terrain.material.Material;
-import me.jellysquid.mods.sodium.client.render.chunk.vertex.format.ChunkMeshAttribute;
-import me.jellysquid.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
-import me.jellysquid.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
+import me.cortex.nvidium.mixin.sodium.GlVertexFormatAccessor;
+import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.caffeinemc.mods.sodium.api.util.ColorABGR;
 import net.caffeinemc.mods.sodium.api.util.ColorU8;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
 import net.minecraft.util.math.MathHelper;
 import org.lwjgl.system.MemoryUtil;
 
 public class NvidiumCompactChunkVertex implements ChunkVertexType {
-    public static final GlVertexFormat<ChunkMeshAttribute> VERTEX_FORMAT = new GlVertexFormat<>(ChunkMeshAttribute.class, null, 16);
-
     public static final int STRIDE = 16;
+    public static final GlVertexFormat VERTEX_FORMAT = new GlVertexFormat(
+        ((GlVertexFormatAccessor) CompactChunkVertex.VERTEX_FORMAT).getAttributesKeyed(),
+        null,
+        STRIDE
+    );
     public static final NvidiumCompactChunkVertex INSTANCE = new NvidiumCompactChunkVertex();
 
     private static final int POSITION_MAX_VALUE = 65536;
@@ -23,42 +25,30 @@ public class NvidiumCompactChunkVertex implements ChunkVertexType {
 
     private static final float MODEL_ORIGIN = 8.0f;
     private static final float MODEL_RANGE = 32.0f;
-    private static final float MODEL_SCALE = MODEL_RANGE / POSITION_MAX_VALUE;
     private static final float MODEL_SCALE_INV = POSITION_MAX_VALUE / MODEL_RANGE;
-    private static final float TEXTURE_SCALE = (1.0f / TEXTURE_MAX_VALUE);
-
 
     @Override
-    public float getTextureScale() {
-        return TEXTURE_SCALE;
-    }
-
-    @Override
-    public float getPositionScale() {
-        return MODEL_SCALE;
-    }
-
-    @Override
-    public float getPositionOffset() {
-        return -MODEL_ORIGIN;
-    }
-
-    @Override
-    public GlVertexFormat<ChunkMeshAttribute> getVertexFormat() {
+    public GlVertexFormat getVertexFormat() {
         return VERTEX_FORMAT;
     }
 
     @Override
     public ChunkVertexEncoder getEncoder() {
-        return (ptr, material, vertex, sectionIndex) -> {
-            int light = compactLight(vertex.light);
+        return (ptr, material, vertices, sectionIndex) -> {
+            for(int i = 0; i < 4; i++) {
+                var vertex = vertices[i];
 
-            MemoryUtil.memPutInt(ptr + 0, (encodePosition(vertex.x) << 0) | (encodePosition(vertex.y) << 16));
-            MemoryUtil.memPutInt(ptr + 4, (encodePosition(vertex.z) << 0) | (encodeDrawParameters(material) << 16) | ((light&0xFF)<<24));
-            MemoryUtil.memPutInt(ptr + 8, (encodeColor(vertex.color) << 0) | (((light>>8)&0xFF) << 24));
-            MemoryUtil.memPutInt(ptr + 12, encodeTexture(vertex.u, vertex.v));
+                int light = compactLight(vertex.light);
 
-            return ptr + STRIDE;
+                MemoryUtil.memPutInt(ptr + 0, (encodePosition(vertex.x) << 0) | (encodePosition(vertex.y) << 16));
+                MemoryUtil.memPutInt(ptr + 4, (encodePosition(vertex.z) << 0) | (encodeDrawParameters(material) << 16) | ((light & 0xFF) << 24));
+                MemoryUtil.memPutInt(ptr + 8, (encodeColor(vertex.color) << 0) | (((light >> 8) & 0xFF) << 24));
+                MemoryUtil.memPutInt(ptr + 12, encodeTexture(vertex.u, vertex.v));
+
+                ptr += STRIDE;
+            }
+
+            return ptr;
         };
     }
 
@@ -74,8 +64,8 @@ public class NvidiumCompactChunkVertex implements ChunkVertexType {
         return (int) ((MODEL_ORIGIN + v) * MODEL_SCALE_INV);
     }
 
-    private static int encodeDrawParameters(Material material) {
-        return ((material.bits() & 0xFF) << 0);
+    private static int encodeDrawParameters(int material) {
+        return ((material & 0xFF) << 0);
     }
 
 
@@ -88,7 +78,6 @@ public class NvidiumCompactChunkVertex implements ChunkVertexType {
 
         return ColorABGR.pack(r, g, b, 0x00);
     }
-
 
     private static int encodeTexture(float u, float v) {
         return ((Math.round(u * TEXTURE_MAX_VALUE) & 0xFFFF) << 0) |

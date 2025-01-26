@@ -15,8 +15,8 @@ import me.cortex.nvidium.renderers.*;
 import me.cortex.nvidium.util.DownloadTaskStream;
 import me.cortex.nvidium.util.TickableManager;
 import me.cortex.nvidium.util.UploadingBufferStream;
-import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderMatrices;
-import me.jellysquid.mods.sodium.client.render.viewport.Viewport;
+import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
+import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
 import org.joml.*;
@@ -255,11 +255,14 @@ public class RenderPipeline {
                         .getToAddress(addr);
                 addr += 4*4*4;
             }
+
+            var fog = RenderSystem.getShaderFog();
+
             new Vector4i(chunkPos.x, chunkPos.y, chunkPos.z, 0).getToAddress(addr);//Chunk the camera is in
             addr += 16;
             new Vector4f(delta,0).getToAddress(addr);//Subchunk offset (note, delta is already negated)
             addr += 16;
-            new Vector4f(RenderSystem.getShaderFogColor()).getToAddress(addr);
+            new Vector4f(fog.red(), fog.green(), fog.blue(), fog.alpha()).getToAddress(addr);
             addr += 16;
             MemoryUtil.memPutLong(addr, sceneUniform.getDeviceAddress() + SCENE_SIZE);//Put in the location of the region indexs
             addr += 8;
@@ -290,11 +293,11 @@ public class RenderPipeline {
             addr += 4;
             MemoryUtil.memPutFloat(addr, ((float)screenHeight)/2);
             addr += 4;
-            MemoryUtil.memPutFloat(addr, RenderSystem.getShaderFogStart());//FogStart
+            MemoryUtil.memPutFloat(addr, fog.start());//FogStart
             addr += 4;
-            MemoryUtil.memPutFloat(addr, RenderSystem.getShaderFogEnd());//FogEnd
+            MemoryUtil.memPutFloat(addr, fog.end());//FogEnd
             addr += 4;
-            MemoryUtil.memPutInt(addr, RenderSystem.getShaderFogShape().getId());//IsSphericalFog
+            MemoryUtil.memPutInt(addr, fog.shape().getId());//IsSphericalFog
             addr += 4;
             MemoryUtil.memPutShort(addr, (short) visibleRegions);
             addr += 2;
